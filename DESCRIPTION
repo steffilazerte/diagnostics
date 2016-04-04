@@ -1,0 +1,15 @@
+Package: diagnostics
+Type: Package
+Title: Diagnostics for Linear Models
+Version: 0.1.0
+Authors@R: person("Steffi", "LaZerte", email = "steffi@steffi.ca",
+  role = c("aut", "cre"))
+Description: Residual and QQ normality plots, multicollinearity,
+    influential observations, transformations.
+License: GPL-3
+Depends: ggplot2 (>= 2.1.0)
+Imports:
+    lme4,
+    Matrix
+LazyData: TRUE
+RoxygenNote: 5.0.1
