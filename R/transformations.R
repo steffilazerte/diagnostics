@@ -1,6 +1,9 @@
 
 #' Transformations
 #'
+#' Function to easily transform variables in a variety of ways.
+#' By default, variables are anchored at one to maximize the effectiveness of the transformations.
+#'
 #' @export
 trans <- function(x, trans, boxcox=NA, anchor = TRUE){
   if(anchor == T & trans != "asn" & (is.na(boxcox) | boxcox!=1))  x <- x - min(x, na.rm=T) + 1
