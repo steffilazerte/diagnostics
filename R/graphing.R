@@ -1,19 +1,35 @@
 #' QQ normality plots with ggplot2
 #'
+#' @import ggplot2
 #' @export
 ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
 
-  if(!(class(model) == "lm" | grepl("mer", class(model)))) {
+  cls <- class(model)
+  if(grepl("mer", cls)) cls <- "lmer"
+
+  if(!(cls %in% c("lm", "lme", "lmer"))) {
     stop("'model' must be either a lm, lme, lmer, or glmer model")
+  }
+
+  if(cls == "lm" & level != "all") {
+    message("levels only apply to mixed models, reverting to level = \"all\"")
+    level <- "all"
   }
 
   # Get residuals in a data frame
   if(level == "all") {
     y <- resid(model)[!is.na(resid(model))]
     m <- data.frame(n=1, resid = resid(model))
+    title <- ifelse(cls == "lm", "QQ Plot", "QQ Plot: Fixed")
   } else {
-    y <- ranef(model)[[level]][[1]][!is.na(ranef(model)[[level]][[1]])]
-    m <- data.frame(n=1, resid = ranef(model)[[level]][[1]])
+    if(cls == "lme") rand <- nlme::ranef(model, level = level)[[1]]
+    if(cls == "lmer") {
+      rand <- lme4::ranef(model)
+      rand <- rand[[names(rand)[grepl(level, names(rand))]]][[1]]
+    }
+    y <- rand[!is.na(rand)]
+    m <- data.frame(n = 1, resid = rand)
+    title <- paste0("QQ Plot: Random - ", level)
   }
 
   # Setup for qqline
@@ -24,10 +40,11 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
 
   # Shapiro test statistic
   if(nrow(m) > 2) {
-    s <- data.frame(p = round(shapiro.test(m$resid)$p.value,digits = 3),
-                    w = round(shapiro.test(m$resid)$statistic,digits = 3))
+    s <- data.frame(p = round(shapiro.test(m$resid)$p.value, digits = 3),
+                    W = round(shapiro.test(m$resid)$statistic, digits = 3))
   } else {
-    s <- data.frame(p = NA, w = NA)
+    message("Less than 3 data points: Can't compute Shapiro Test")
+    s <- data.frame(p = NA, W = NA)
   }
 
   if(plot == TRUE){
@@ -42,7 +59,7 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
                x = -Inf, y = +Inf,
                hjust = 0, vjust = 1,
                size = 3,
-               label = paste0("Shapiro Test \np = ", s$p, "\nW = ", s$w))
+               label = paste0("Shapiro Test \np = ", s$p, "\nW = ", s$W))
     return(p)
   } else {
     return(s)
@@ -53,6 +70,7 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
 
 #' QQ residual plots with ggplot2
 #'
+#' @import ggplot2
 #' @export
 ggResid <- function(model) {
 
