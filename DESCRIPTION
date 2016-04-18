@@ -9,7 +9,11 @@ Description: Residual and QQ normality plots, multicollinearity,
 License: GPL-3
 Depends: ggplot2 (>= 2.1.0)
 Imports:
+    ggplot2,
+    gridExtra,
     lme4,
-    Matrix
+    Matrix,
+    MASS,
+    plyr
 LazyData: TRUE
 RoxygenNote: 5.0.1
