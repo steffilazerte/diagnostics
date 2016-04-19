@@ -1,9 +1,9 @@
 #' KMO for PCA
 #'
+#' @import MASS
 #' @export
 kmo = function( data ){
   ## FROM http://www.opensubscriber.com/message/r-help@stat.math.ethz.ch/7315408.html
-  library(MASS)
   X <- cor(as.matrix(data))
   iX <- ginv(X)
   S2 <- diag(diag((iX^-1)))
@@ -87,6 +87,7 @@ vifmer <- function (fit) {
 #' Check Kappa
 #'
 #' Condition number test less than 10 or 20 (less than 30)
+#'
 #' @import lme4
 #' @export
 kappamer <- function (fit,
@@ -144,86 +145,72 @@ overdisp2.glmer <- function(model) {
 #' Test for influential observtions
 #'
 #' @export
-sig.test <- function(model, group = "obs", alpha = 0.05){
-    require(plyr)
-    if(class(model) == "lm") {
-        group = "obs"
-        data <- model$model
-        orig <- data.frame(n = 0, p = summary(model)$coefficients[,'Pr(>|t|)'])
-    }
-    if(class(model) == "lme") {
-        data <- model$data
-        orig <- data.frame(n = 0, p = summary(model)$tTable[,'p-value'])
-    }
-    if(grepl("mer", class(model))) {
-        data <- model@frame
-        c <- confint(model, method = "Wald", level = 1-alpha)
-        c <- sign(c[,1]) == sign(c[,2])
-        orig <- data.frame(n = 0, p = c[-grep(".sig",names(c))])
-    }
+sig.test <- function(model, group = "obs", verbose = FALSE){
 
-    # Get original significance at alpha
-    orig$var <- row.names(orig)
-    orig <- dcast(orig, formula = n ~ var, value.var = "p")
-    orig <- orig[,2:ncol(orig)]
-    if(!grepl("mer", class(model))) orig <- orig < alpha
+  cls <- class(model)
+  if(grepl("mer", cls)) cls <- "lmer"
 
-    # Get new sig at alpha with sequential omission
-    tests <- data.frame()
-    if(group == "obs") {
-        for(i in 1:nrow(data)) {
-            if(class(model) == "lm")  t <- data.frame(n = i, p = summary(update(model, data = data[-i,]))$coefficients[,'Pr(>|t|)'])
-            if(class(model) == "lme") t <- data.frame(n = i, p = summary(update(model, data = data[-i,]))$tTable[,'p-value'])
-            if(grepl("mer", class(model))) {
-                c <- confint(update(model, data = data[-i,]), method = "Wald", level = 1-alpha)
-                c <- sign(c[,1]) == sign(c[,2])
-                t <- data.frame(n = i, p = c[-grep(".sig",names(c))])
-            }
-            t$var <- row.names(t)
-            t <- dcast(t, formula = n ~ ..., value.var = "p")
-            tests <- rbind(tests, t)
-        }
-    }
-    if(group != "obs") {
-        g <- unique(data[,group]) ## Get unique group names
-        for(i in 1:length(g)) {
-            if(class(model) == "lm")  t <- data.frame(n = g[i], p = summary(update(model, data = data[data[,group]!=g[i],]))$coefficients[,'Pr(>|t|)'])
-            if(class(model) == "lme") t <- data.frame(n = g[i], p = summary(update(model, data = data[data[,group]!=g[i],]))$tTable[,'p-value'])
-            if(grepl("mer", class(model))) {
-                c <- confint(update(model, data = data[data[,group]!=g[i],]), method = "Wald", level = 1-alpha)
-                c <- sign(c[,1]) == sign(c[,2])
-                t <- data.frame(n = g[i], p = c[-grep(".sig",names(c))])
-            }
-            t$var <- row.names(t)
-            t <- dcast(t, formula = n ~ ..., value.var = "p")
-            tests <- rbind(tests, t)
-        }
-    }
+  if(!(cls %in% c("lm", "lme", "lmer"))) {
+    stop("'model' must be either a lm, lme, lmer, or glmer model")
+  }
 
-    if(!grepl("mer", class(model))) tests[,2:ncol(tests)] <- tests[,2:ncol(tests)] < alpha
-    output <- list(orig.sig =  orig,
-                   new.sig = tests,
-                   change.sig = ddply(tests, .(n), .fun = function(x, orig) x[,2:ncol(x)] != orig, orig = orig))
+  if(cls == "lmer" & !grepl("LmerTest", class(model)) & !grepl("glmer", class(model))){
+    stop("Can't test for influential observations without p-values, right now. Try again with library(lmerTest)")
+  }
 
-    return(output)
+  if(cls == "lm") data <- model$model
+  if(cls == "lme") data <- model$data
+  if(cls == "lmer") data <- model@frame
+
+  orig <- get.table(model)
+
+  # Check that obs correct
+  if(cls == "lm" & group != "obs") {
+    message("Different groupings only apply to mixed models, reverting to group = \"obs\"")
+    group <- "obs"
+  } else if (group != "obs" & !(group %in% names(data))) {
+    stop("'group' must be the name of a column (i.e. 'ID'), or 'obs', to reflect observation level grouping.")
+  }
+
+  # Grouping
+  if(group == "obs") {
+    g <- as.list(1:nrow(data))
+  } else {
+    g <- lapply(unique(data[, group]), FUN = function(x) which(data[, group] == x))
+  }
+
+  # Get new sig at alpha with sequential omission
+  tests <- data.frame()
+  for(i in 1:length(g)) {
+    if(verbose) print(paste0(i, " / ", length(g)))
+
+    t <- cbind(n = i,
+               get.table(my.update(model, data = data[-g[[i]], ]))[, c("Parameter", "Value", "P")]
+    )
+    tests <- rbind(tests, t)
+  }
+
+  output <- merge(tests, orig[, c("Parameter", "Value", "P")], by = "Parameter", suffixes = c("", ".orig"))
+  output$diff5 <- (output$P < 0.05) != (output$P.orig < 0.05)
+  output$diff10 <- (output$P < 0.10) != (output$P.orig < 0.10)
+  output <- output[output$diff5 | output$diff10, ]
+
+  return(output)
 }
 
 #' Run Diagnostics
 #'
+#' @import gridExtra
+#' @import influence.ME
+#' @import reshape2
+#' @import lme4
+#' @import car
+
 #' @export
 diagnostic <- function(x, ID = "ID", alpha = 0.05, group = "obs", graphs = T, influence = T, multicol = T, power = F, group.me = NULL) {
-  require(gridExtra)
-  require(influence.ME)
-  require(reshape2)
-  if(class(x) != "lm") {
-    require(lme4)
-  } else require(car)
 
-  if(class(x) == "lme") {
-    require(nlme)
-    require(nlmeU)
-  }
-
+  require(nlme)
+  require(nlmeU)
   ## Get residual plots and normality plots for all levels of the random variables (if present)
   if(graphs == T){
     g <- list()
@@ -293,4 +280,66 @@ diagnostic <- function(x, ID = "ID", alpha = 0.05, group = "obs", graphs = T, in
   }
   if(power == T & class(x) == "lme") {print(paste0("Power alpha = 0.05")); print(p)}
 
+}
+
+#' @export
+get.table <- function(m, analysis = NULL, type = "summary", level = NULL, pca = 1){
+  if(type == "summary") {
+    if(class(m) == "lm"){
+      x <- as.data.frame(summary(m)$coefficients)
+      names(x) <- c("Value","SE","T","P")
+      x$df <- max(summary(m)$df)
+      i1 <- confint(m)
+      i2 <- confint(m, level = 0.9)
+      x$n <- length(m$fitted.values)
+    } else if(class(m) == "lme") {
+      x <- as.data.frame(summary(m)$tTable)
+
+      names(x) <- c("Value","SE","df", "T","P")
+      i1 <- intervals(m, which = "fixed")[[1]]
+      i2 <- intervals(m, which = "fixed", level = 0.9)[[1]]
+      if(is.null(level)) x$n <- nrow(summary(m)$groups) else x$n <- length(unique(m$data[,level]))
+    } else if(grepl("mer", class(m))) {
+      x <- as.data.frame(summary(m)$coefficients)
+      if(class(m) == "glmerMod") {
+        names(x) <- c("Value", "SE", "T","P")
+        x$note <- "Test statistic is z not T"
+      } else if (grepl("Test", class(m))) {
+        x <- as.data.frame(lmerTest::summary(m)$coefficients)
+        names(x) <- c("Value", "SE", "df","T","P")
+      } else {
+        names(x) <- c("Value", "SE", "T")
+      }
+      i1 <- confint(m, method = "Wald")
+      i1 <- i1[-grep(".sig",row.names(i1)),]
+      i2 <- confint(m, method = "Wald", level = 0.9)
+      i2 <- i2[-grep(".sig",row.names(i2)),]
+      if(is.null(level)) x$n <- nrow(m@frame) else x$n <- length(unique(m@frame[,level]))
+    }
+    x$Parameter <- row.names(x)
+    x$CI.95 <- x$Value - i1[,1]
+    x$CI.90 <- x$Value - i2[,1]
+    x$sig.95 <- ifelse((abs(x$Value) - x$CI.95) > 0, T, F)
+    x$sig.90 <- ifelse((abs(x$Value) - x$CI.90) > 0, T, F)
+    if(!any(grepl("^df$", names(x)))) x$df <- ""
+    if(!any(grepl("^P$", names(x)))) x$P <- ""
+    if(!any(grepl("^note$", names(x)))) x$note <- ""
+    x <- x[,c("Parameter","Value","SE","df","T","P","n","CI.95","sig.95","CI.90","sig.90","note")]
+  } else if(type == "anova") {
+    if(class(m) == "lme") {
+      x <- anova(m)
+      names(x) <- c("df_num","df_den","F","P")
+      x <- cbind(Parameter = row.names(x), x)
+    } else if(grepl("mer", class(m))) {
+      x <- anova(m)
+      names(x) <- c("df","SS","MS","F")
+      x <- cbind(Parameter = row.names(x), x)
+    }
+  } else if(type == "pca" & class(m) == "prcomp") {
+    x <- round(as.data.frame(m$rotation)[,1:pca],3)
+    for(i in 1:pca) x[,paste0("Var",i)] <- round(summary(m)$importance[2,i],3)
+    x <- cbind(Parameter = row.names(x),x)
+  }
+  if(!is.null(analysis)) x <- cbind(Analysis = analysis, x)
+  return(x)
 }
