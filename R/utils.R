@@ -13,7 +13,10 @@ my.update <- function(mod, formula = NULL, data = NULL) {
   if (!is.null(formula)) call$formula <- update.formula(call$formula, formula)
   env <- attr(term, ".Environment")
 
-  eval(call, env, parent.frame())
+  e <- eval(call, env, parent.frame())
+  if(grepl("LmerTest", class(mod))) e <- as(e, "merModLmerTest") ##If lmerTest, force back
+
+  return(e)
 }
 
 test.plot <- function(model, level = "all", type = "QQ") {
