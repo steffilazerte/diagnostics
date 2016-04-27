@@ -179,146 +179,170 @@ sig.test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
   # Grouping
   if(group == "obs") {
     g <- as.list(1:nrow(data))
+    names(g) <- 1:nrow(data)
   } else {
     g <- lapply(unique(data[, group]), FUN = function(x) which(data[, group] == x))
+    names(g) <- unique(data[, group])
   }
 
-  # Get new sig at alpha with sequential omission
-  tests <- data.frame()
-  for(i in 1:length(g)) {
-    if(verbose) print(paste0(i, " / ", length(g)))
+  # Get new sig with sequential omission
+  if(cls != "lmer") tests <- plyr::ldply(g, .fun = function(x) get.table(my.update(model, data = data[-x, ]))[, c("Parameter", "Value", "P")], .id = 'group', .progress = ifelse(verbose, "text", "none"))
+  if(cls == "lmer") tests <- plyr::ldply(g, .fun = function(x) get.table(as(my.update(model, data = data[-x, ]), "merModLmerTest"))[, c("Parameter", "Value", "P")], .id = 'group', .progress = ifelse(verbose, "text", "none"))
 
-    t <- cbind(n = i,
-               get.table(my.update(model, data = data[-g[[i]], ]))[, c("Parameter", "Value", "P")]
-    )
-    tests <- rbind(tests, t)
+  if(any(tests$P == "")) {
+    message("Influential: Some models had problems and alternate P-values could not be computed. Influential tests unreliable...")
+  } else {
+    output <- merge(tests, orig[, c("Parameter", "Value", "P")], by = "Parameter", suffixes = c("", ".orig"))
+    output$diff5 <- (output$P < 0.05) != (output$P.orig < 0.05)
+    output$diff10 <- (output$P < 0.10) != (output$P.orig < 0.10)
+
+    if(!all) output <- output[output$diff5 | output$diff10, ]
+
+    if(nrow(output) == 0) message("No influential observations") else {
+      return(output)
+      message("Note that for group = \"obs\" numbers returned refer to the row in a data frame without NA values.")
+    }
   }
-
-  output <- merge(tests, orig[, c("Parameter", "Value", "P")], by = "Parameter", suffixes = c("", ".orig"))
-  output$diff5 <- (output$P < 0.05) != (output$P.orig < 0.05)
-  output$diff10 <- (output$P < 0.10) != (output$P.orig < 0.10)
-  output <- output[output$diff5 | output$diff10, ]
-
-  return(output)
 }
+
+#' Test for multicolinearity
+#'
+#' @export
+multicol <- function(model) {
+  cls <- class(model)
+  if(grepl("merMod", cls)) cls <- "lmer"
+
+  if(get.ncoef(model) > 2){
+    if(cls == "lm") {
+      v <- car::vif(model)[, 1]
+      k <- kappa(model)
+    }
+    if(cls != "lm") {
+      v <- vifmer(model)
+      k <- kappamer(model)
+    }
+  } else {
+    v <- k <- NA
+    message("Can't calculate multicolinearity if there are less than 2 predictors.")
+  }
+  return(list(v = v, k = k))
+}
+
 
 #' Run Diagnostics
 #'
 #' @import gridExtra
 #' @import influence.ME
-#' @import reshape2
-#' @import lme4
 #' @import car
-
 #' @export
-diagnostic <- function(x, ID = "ID", alpha = 0.05, group = "obs", graphs = T, influence = T, multicol = T, power = F, group.me = NULL) {
+diagnostic <- function(model, group = "obs", graphs = TRUE, influence = TRUE, multicol = TRUE, verbose = FALSE) {
 
-  require(nlme)
-  require(nlmeU)
+  cls <- class(model)
+  if(grepl("merMod", cls)) cls <- "lmer"
+  if(!(cls %in% c("lm", "lme", "lmer"))) stop("'model' must be either a lm, lme, lmer, or glmer model")
+
+  #require(nlme)
+  #require(nlmeU)
+
   ## Get residual plots and normality plots for all levels of the random variables (if present)
   if(graphs == T){
     g <- list()
-    g[[1]] <- ggResid(x) + labs(title = "Residual Plot") ## Residual
-    g[[2]] <- ggQQ(x) + labs(title = "QQ Normality Plot") ## General Normality
-    if(class(x) == "lme" | grepl("mer", class(x))) {
-      for(a in 3:(length(ranef(x))+2)) {
-        if(length(ranef(x)[[a-2]][[1]]) > 2 & mean(abs(ranef(x)[[a-2]][[1]])) > 0){
-          g[[length(g)+1]] <- ggQQ(x, level = a-2) + labs(title = paste0("QQ Normality Plot Level ", a-2)) ## Normality of random
-        }
-      }
+
+    # Fixed Effects
+    g[[1]] <- ggResid(model) + labs(title = "Residual Plot") # Residual
+    g[[2]] <- ggQQ(model) + labs(title = "QQ Normality Plot") # Normality
+
+    # Random Effects Normality
+    if(cls %in% c("lme", "lmer")) {
+      for(a in get.random(model)) g[[length(g) + 1]] <- ggQQ(model, level = a)
     }
-    do.call("grid.arrange", c(g, nrow = 1))  ## Plot
+
+    # Show all together
+    do.call(gridExtra::grid.arrange, c(g, nrow = 1))  ## Plot
   }
 
-  ## Get power
-  if(power == T & class(x) == "lme") p <- Pwr(x)
-
-  m <- x
-  if(class(x) == "lme") m <- lmer(formula(paste0(deparse(x$call$fixed), " + (", gsub("\\~(+)", "\\1",deparse(x$call$random)),")")), data = x$data, control=lmerControl(optimizer="bobyqa"))
-
-  ## Get influential observations
+  # Get influential observations
   if(influence == T){
-    n <- "Not calculable"
-    v <- "Not applicable"
-    k <- "Not applicable"
+    # Influential obs
+    i <- sig.test(model, group = group, verbose = verbose)
+    if(!is.null(i)) {
+      i <- i[, c("group", "Parameter", "Value.orig", "Value", "P.orig", "P")]
+      i[, -c(1:2)] <- apply(i[, -c(1:2)], 2, round, 3)
+      i$Diff <- NA
+      i$Diff[i$P.orig < 0.05 & (i$P >= 0.05 & i$P < 0.10)] <- "Sig => Trend"
+      i$Diff[i$P.orig < 0.05 & (i$P >= 0.10)] <- "Sig => Non Sig"
+      i$Diff[(i$P.orig >= 0.05 & i$P.orig < 0.10) & (i$P < 0.05)] <- "Trend => Sig"
+      i$Diff[(i$P.orig >= 0.05 & i$P.orig < 0.10) & (i$P >= 0.10)] <- "Trend => Non Sig"
+      i$Diff[(i$P.orig >= 0.10) & (i$P < 0.05)] <- "Non Sig => Sig"
+      i$Diff[(i$P.orig >= 0.10) & (i$P >= 0.05 & i$P < 0.10)] <- "Non Sig => Trend"
+      names(i) <- c("Obs", "Param", "Value", "New Value", "P", "New P", "Diff")
+    }
 
-    if(!any(grep("~ 1", getCall(x)))) {
-      i <- sigtest(x, group = group, alpha = alpha)[[3]]
-      n <- vector()
-      ## Get cooks
-      cooks <- vector()
-      if(class(x) != "lm"){
-        cks <- round(cooks.distance(influence(m, obs = ifelse(is.null(group.me), T, F), group = group.me)),3)
-      } else cks <- round(influence.measures(m)$infmat[,'cook.d'],3)
-
-      for(a in 1:nrow(i)) {
-        if(any(i[a,-1] == T)) {
-          n <- c(n,paste0(i$n[a], " (",paste0(names(i[,-1])[which(i[a,-1]==T)], collapse = ", "),")"))
-          cooks <- c(cooks, cks[a])
-        }
-      }
-
-      if(length(n) == 0) n <- "None"
-    } else cooks <- "N/A"
+    # Cooks distances
+    #cooks <- predictmeans::CookD(model, group = if(group == "obs") NULL else group, plot = FALSE)
+    #cooks <- data.frame(cook = cooks, obs = names(cooks))
+    #cooks <- cooks[cooks > 1]
   }
 
-  ## Get Multiple colinearity
-  if(multicol == T & !any(grep("~ 1", getCall(x)))){
-    if(class(x) != "lm") {
-      v <- vif.mer(m)
-      k <- kappa.mer(m)
-    } else {
-      if(length(m$coefficients) > 2) v <- vif(m) else v <- NA
-      if(!is.null(dim(v))) v <- v[,1]
-      k <- kappa(m)
-    }
-  } else {v <- NA; k <- NA}
+  # Get Multicolinearity
+  if(multicol == T){
+    m <- multicol(model)
+    k <- m$k
+    v <- m$v
+  }
 
   ## Display
-  if(influence == T) if(length(n) > 0 & class(x) == "lm") print("NOTE: Influence identifies rows in a data frame from which all missing variables are removed.")
-  if(influence == T) print(paste0("Influence: ", paste0(n, collapse = "; ")))
-  if(influence == T) print(paste0("Cooks Distances: ", paste0(cooks, collapse = "; ")))
-  if(multicol == T) {
+  if(influence == T & !is.null(i)) {
+    message("Influence: \n")
+    print(i)
+   # message(paste0("Cooks Distances: ", paste0(cooks, collapse = "; ")))
+  }
+  if(multicol == T & any(!is.na(v), !is.na(k))) {
+    message("Multicolinearity:\n")
     print(paste0("VIF: ", paste(names(v), round(v, digits = 1), sep = " ")))
     print(paste0("Kappa: ", round(k,digits = 1)))
   }
-  if(power == T & class(x) == "lme") {print(paste0("Power alpha = 0.05")); print(p)}
-
 }
 
+#' Report summary statistics for different models
+#'
 #' @export
-get.table <- function(m, analysis = NULL, type = "summary", level = NULL, pca = 1){
+get.table <- function(model, analysis = NULL, type = "summary", level = NULL, pca = 1){
   if(type == "summary") {
-    if(class(m) == "lm"){
-      x <- as.data.frame(summary(m)$coefficients)
+    cls <- class(model)
+    if(grepl("merMod", cls)) cls <- "lmer"
+    if(cls == "lm"){
+      x <- as.data.frame(summary(model)$coefficients)
       names(x) <- c("Value","SE","T","P")
-      x$df <- max(summary(m)$df)
-      i1 <- confint(m)
-      i2 <- confint(m, level = 0.9)
-      x$n <- length(m$fitted.values)
-    } else if(class(m) == "lme") {
-      x <- as.data.frame(summary(m)$tTable)
-
+      x$df <- max(summary(model)$df)
+      i1 <- confint(model)
+      i2 <- confint(model, level = 0.9)
+      x$n <- length(model$fitted.values)
+    } else if(cls == "lme") {
+      x <- as.data.frame(summary(model)$tTable)
       names(x) <- c("Value","SE","df", "T","P")
-      i1 <- intervals(m, which = "fixed")[[1]]
-      i2 <- intervals(m, which = "fixed", level = 0.9)[[1]]
-      if(is.null(level)) x$n <- nrow(summary(m)$groups) else x$n <- length(unique(m$data[,level]))
-    } else if(grepl("mer", class(m))) {
-      x <- as.data.frame(summary(m)$coefficients)
-      if(class(m) == "glmerMod") {
+      i1 <- intervals(model, which = "fixed")[[1]]
+      i2 <- intervals(model, which = "fixed", level = 0.9)[[1]]
+      if(is.null(level)) x$n <- nrow(summary(model)$groups) else x$n <- length(unique(model$data[,level]))
+    } else if(cls == "lmer") {
+      if(class(model) == "glmerMod") {
+        x <- as.data.frame(summary(model)$coefficients)
         names(x) <- c("Value", "SE", "T","P")
         x$note <- "Test statistic is z not T"
-      } else if (grepl("Test", class(m))) {
-        x <- as.data.frame(lmerTest::summary(m)$coefficients)
-        names(x) <- c("Value", "SE", "df","T","P")
+      } else if (grepl("Test", class(model))) {
+        x <- suppressMessages(as.data.frame(lmerTest::summary(model)$coefficients))
+        if(any(names(x) == "df")) {
+          names(x) <- c("Value", "SE", "df","T","P")
+        } else names(x) <- c("Value", "SE", "T")
       } else {
+        x <- as.data.frame(summary(model)$coefficients)
         names(x) <- c("Value", "SE", "T")
       }
-      i1 <- confint(m, method = "Wald")
+      i1 <- confint(model, method = "Wald")
       i1 <- i1[-grep(".sig",row.names(i1)),]
-      i2 <- confint(m, method = "Wald", level = 0.9)
+      i2 <- confint(model, method = "Wald", level = 0.9)
       i2 <- i2[-grep(".sig",row.names(i2)),]
-      if(is.null(level)) x$n <- nrow(m@frame) else x$n <- length(unique(m@frame[,level]))
+      if(is.null(level)) x$n <- nrow(model@frame) else x$n <- length(unique(model@frame[,level]))
     }
     x$Parameter <- row.names(x)
     x$CI.95 <- x$Value - i1[,1]
@@ -330,19 +354,15 @@ get.table <- function(m, analysis = NULL, type = "summary", level = NULL, pca = 
     if(!any(grepl("^note$", names(x)))) x$note <- ""
     x <- x[,c("Parameter","Value","SE","df","T","P","n","CI.95","sig.95","CI.90","sig.90","note")]
   } else if(type == "anova") {
-    if(class(m) == "lme") {
-      x <- anova(m)
+    if(cls == "lme") {
+      x <- anova(model)
       names(x) <- c("df_num","df_den","F","P")
       x <- cbind(Parameter = row.names(x), x)
     } else if(grepl("mer", class(m))) {
-      x <- anova(m)
+      x <- anova(model)
       names(x) <- c("df","SS","MS","F")
       x <- cbind(Parameter = row.names(x), x)
     }
-  } else if(type == "pca" & class(m) == "prcomp") {
-    x <- round(as.data.frame(m$rotation)[,1:pca],3)
-    for(i in 1:pca) x[,paste0("Var",i)] <- round(summary(m)$importance[2,i],3)
-    x <- cbind(Parameter = row.names(x),x)
   }
   if(!is.null(analysis)) x <- cbind(Analysis = analysis, x)
   return(x)
