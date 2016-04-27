@@ -5,7 +5,7 @@
 \title{Plot possible transformations}
 \usage{
 trans.plot(model, t = c("log", "inverse", "^1/2", "^2", "^3"), boxcox = NA,
-  find.best = F)
+  find.best = FALSE, verbose = FALSE)
 }
 \description{
 Plot possible transformations
