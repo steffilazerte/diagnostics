@@ -7,6 +7,7 @@
 trans(x, trans, boxcox = NA, anchor = TRUE)
 }
 \description{
-Transformations
+Function to easily transform variables in a variety of ways.
+By default, variables are anchored at one to maximize the effectiveness of the transformations.
 }
 
