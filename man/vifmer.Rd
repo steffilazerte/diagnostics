@@ -7,6 +7,6 @@
 vifmer(fit)
 }
 \description{
-Check VIF
+https://github.com/aufrank/R-hacks/blob/master/mer-utils.R
 }
 

@@ -4,10 +4,13 @@
 \alias{kappamer}
 \title{Check Kappa}
 \usage{
-kappamer(fit, scale = TRUE, center = FALSE, add.intercept = TRUE,
+kappamer(fit, scale = TRUE, center = FALSE, add.intercept = FALSE,
   exact = FALSE)
 }
 \description{
+https://github.com/aufrank/R-hacks/blob/master/mer-utils.R
+}
+\details{
 Condition number test less than 10 or 20 (less than 30)
 }
 
