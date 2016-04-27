@@ -46,6 +46,8 @@ test.plot <- function(model, level = "all", type = "QQ") {
   print(g, vp = vp1)
 }
 
+#' @importFrom nlme getData
+#' @export
 getData.merMod <- function(model){
   call <- getCall(model)
   if (is.null(call)) {
@@ -61,6 +63,7 @@ getData.merMod <- function(model){
   return(data)
 }
 
+#' @export
 getData.lm <- function(model){
   data <- model$model
   return(data)
