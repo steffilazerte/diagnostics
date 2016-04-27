@@ -34,6 +34,8 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
 
   if(nrow(m) < 2) {
     message("Fewer than 2 levels, no plot possible")
+  } else if(sd(m$resid) == 0) {
+    message(paste0("Too little variability in '", level, "': QQ Norm plot skipped"))
   } else {
     # Setup for qqline
     x <- qnorm(c(0.25,0.75))
@@ -42,15 +44,12 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
     int <- y[1L] - slope * x[1L]
 
     # Shapiro test statistic
-    if(nrow(m) > 2 | all(m$resid == 0)) {
-      s <- data.frame(p = round(shapiro.test(m$resid)$p.value, digits = 3),
-                      W = round(shapiro.test(m$resid)$statistic, digits = 3))
-    } else if(nrow(m) <= 2) {
+    if(nrow(m) <= 2) {
       message(paste0("Less than 3 data points in '", level, "': Can't compute Shapiro Test"))
       s <- data.frame(p = NA, W = NA)
-    } else if(sd(m$resid) == 0) {
-      message(paste0("Too little variability in '", level, "': Can't compute Shapiro Test"))
-      s <- data.frame(p = NA, W = NA)
+    } else {
+      s <- data.frame(p = round(shapiro.test(m$resid)$p.value, digits = 3),
+                      W = round(shapiro.test(m$resid)$statistic, digits = 3))
     }
 
 
