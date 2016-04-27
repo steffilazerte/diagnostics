@@ -4,7 +4,7 @@
 \alias{ggQQ}
 \title{QQ normality plots with ggplot2}
 \usage{
-ggQQ(model, level = "all")
+ggQQ(model, level = "all", plot = TRUE, title = NULL)
 }
 \description{
 QQ normality plots with ggplot2
