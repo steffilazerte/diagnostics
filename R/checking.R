@@ -193,6 +193,7 @@ sig.test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
     message("Influential: Some models had problems and alternate P-values could not be computed. Influential tests unreliable...")
   } else {
     output <- merge(tests, orig[, c("Parameter", "Value", "P")], by = "Parameter", suffixes = c("", ".orig"))
+    output[, c("Value", "P", "Value.orig", "P.orig")] <- apply(output[, c("Value", "P", "Value.orig", "P.orig")], 2, round, 4)
     output$diff5 <- (output$P < 0.05) != (output$P.orig < 0.05)
     output$diff10 <- (output$P < 0.10) != (output$P.orig < 0.10)
 
@@ -267,7 +268,6 @@ diagnostic <- function(model, group = "obs", graphs = TRUE, influence = TRUE, mu
     i <- sig.test(model, group = group, verbose = verbose)
     if(!is.null(i)) {
       i <- i[, c("group", "Parameter", "Value.orig", "Value", "P.orig", "P")]
-      i[, -c(1:2)] <- apply(i[, -c(1:2)], 2, round, 3)
       i$Diff <- NA
       i$Diff[i$P.orig < 0.05 & (i$P >= 0.05 & i$P < 0.10)] <- "Sig => Trend"
       i$Diff[i$P.orig < 0.05 & (i$P >= 0.10)] <- "Sig => Non Sig"
@@ -276,6 +276,7 @@ diagnostic <- function(model, group = "obs", graphs = TRUE, influence = TRUE, mu
       i$Diff[(i$P.orig >= 0.10) & (i$P < 0.05)] <- "Non Sig => Sig"
       i$Diff[(i$P.orig >= 0.10) & (i$P >= 0.05 & i$P < 0.10)] <- "Non Sig => Trend"
       names(i) <- c("Obs", "Param", "Value", "New Value", "P", "New P", "Diff")
+
     }
 
     # Cooks distances
