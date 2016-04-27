@@ -13,6 +13,10 @@ diagnostic(m0)
 diagnostic(m1)
 ggQQ(m1, level = "region")
 
+songs <- read.csv("~/Projects/Chorus - BCCH/Data/Datasets/bcch_exp_mean_difference.txt")
+summary(m0 <- lmer(freq.change.log ~ spl + (1|region), data = songs))
+diagnostic(m0)
+
 m.lm1 <- lm(distance ~ age, data = Orthodont)
 m.lm2 <- lm(distance ~ age + Subject, data = Orthodont)
 
