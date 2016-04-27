@@ -20,7 +20,7 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
   if(level == "all") {
     y <- resid(model)[!is.na(resid(model))]
     m <- data.frame(n=1, resid = resid(model))
-    title <- ifelse(cls == "lm", "QQ Plot", "QQ Plot: Fixed")
+    if(is.null(title)) title <- ifelse(cls == "lm", "QQ Plot", "QQ Plot: Fixed")
   } else {
     if(cls == "lme") rand <- nlme::ranef(model, level = level)[[1]]
     if(cls == "lmer") {
@@ -29,7 +29,7 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
     }
     y <- rand[!is.na(rand)]
     m <- data.frame(n = 1, resid = rand)
-    title <- paste0("QQ Plot: Random - ", level)
+    if(is.null(title)) title <- paste0("QQ Plot: Random - ", level)
   }
 
   if(nrow(m) < 2) {
@@ -60,7 +60,7 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
         geom_abline(slope = slope, intercept = int, color="blue") +
         labs(y = "Sample Residuals",
              x = "Theoretical Quantiles",
-             title = ifelse(is.null(title), "QQ Plot", title)) +
+             title = title) +
         annotate(geom = "text",
                  x = -Inf, y = +Inf,
                  hjust = 0, vjust = 1,
