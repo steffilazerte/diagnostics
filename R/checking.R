@@ -338,9 +338,9 @@ get.table <- function(model, analysis = NULL, type = "summary", level = NULL, pc
         x <- as.data.frame(summary(model)$coefficients)
         names(x) <- c("Value", "SE", "T")
       }
-      i1 <- confint(model, method = "Wald")
+      i1 <- data.frame(confint(model, method = "Wald"))
       i1 <- i1[-grep(".sig",row.names(i1)),]
-      i2 <- confint(model, method = "Wald", level = 0.9)
+      i2 <- data.frame(confint(model, method = "Wald", level = 0.9))
       i2 <- i2[-grep(".sig",row.names(i2)),]
       if(is.null(level)) x$n <- nrow(model@frame) else x$n <- length(unique(model@frame[,level]))
     }
