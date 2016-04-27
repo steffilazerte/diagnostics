@@ -4,7 +4,7 @@
 \alias{sig.test}
 \title{Test for influential observtions}
 \usage{
-sig.test(model, group = "obs", alpha = 0.05)
+sig.test(model, group = "obs", all = FALSE, verbose = FALSE)
 }
 \description{
 Test for influential observtions
