@@ -155,23 +155,17 @@ overdisp2.glmer <- function(model) {
 #' Test for influential observtions
 #'
 #' @export
-sig.test <- function(model, group = "obs", verbose = FALSE){
+sig.test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
 
   cls <- class(model)
-  if(grepl("mer", cls)) cls <- "lmer"
-
-  if(!(cls %in% c("lm", "lme", "lmer"))) {
-    stop("'model' must be either a lm, lme, lmer, or glmer model")
-  }
+  if(grepl("merMod", cls)) cls <- "lmer"
+  if(!(cls %in% c("lm", "lme", "lmer"))) stop("'model' must be either a lm, lme, lmer, or glmer model")
 
   if(cls == "lmer" & !grepl("LmerTest", class(model)) & !grepl("glmer", class(model))){
     stop("Can't test for influential observations without p-values, right now. Try again with library(lmerTest)")
   }
 
-  if(cls == "lm") data <- model$model
-  if(cls == "lme") data <- model$data
-  if(cls == "lmer") data <- model@frame
-
+  data <- getData(model)
   orig <- get.table(model)
 
   # Check that obs correct
