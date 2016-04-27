@@ -4,8 +4,8 @@
 \alias{diagnostic}
 \title{Run Diagnostics}
 \usage{
-diagnostic(x, ID = "ID", alpha = 0.05, group = "obs", graphs = T,
-  influence = T, multicol = T, power = F, group.me = NULL)
+diagnostic(model, group = "obs", graphs = T, influence = T,
+  multicol = T, group.me = NULL)
 }
 \description{
 Run Diagnostics
