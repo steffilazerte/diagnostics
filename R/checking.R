@@ -62,6 +62,8 @@ bartlett.sphere<-function(data){
 
 #' Check VIF
 #'
+#' https://github.com/aufrank/R-hacks/blob/master/mer-utils.R
+#'
 #' @import lme4
 #' @import Matrix
 #' @export
@@ -71,45 +73,53 @@ vifmer <- function (fit) {
     v <- vcov(fit)
     nam <- names(fixef(fit))
 
-    ## exclude intercepts
-     ns <- sum(1 * (nam == "Intercept" | nam == "(Intercept)"))
-     if (ns > 0) {
-         v <- v[-(1:ns), -(1:ns), drop = FALSE]
-         nam <- nam[-(1:ns)]
-     }
+    # exclude intercepts
+    ns <- sum(1 * (nam == "Intercept" | nam == "(Intercept)"))
+    if (ns > 0) {
+       v <- v[-(1:ns), -(1:ns), drop = FALSE]
+       nam <- nam[-(1:ns)]
+    }
 
-     d <- diag(v)^0.5
-     v <- Matrix::diag(solve(v/(d %o% d)))
-     names(v) <- nam
+    d <- diag(v)^0.5
+    v <- Matrix::diag(solve(v/(d %o% d)))
+    names(v) <- nam
     return(v)
 }
 
 #' Check Kappa
+#'
+#' https://github.com/aufrank/R-hacks/blob/master/mer-utils.R
 #'
 #' Condition number test less than 10 or 20 (less than 30)
 #'
 #' @import lme4
 #' @export
 kappamer <- function (fit,
-                       scale = TRUE, center = FALSE,
-                       add.intercept = TRUE,
-                       exact = FALSE) {
-    X <- getME(fit, name = "X")
-    nam <- names(fixef(fit))
+                      scale = TRUE, center = FALSE,
+                      add.intercept = FALSE,
+                      exact = FALSE) {
+  cls <- class(fit)
+  if(grepl("merMod", cls)) cls <- "lmer"
 
-    ## exclude intercepts
-    nrp <- sum(1 * (nam == "(Intercept)"))
-    if (nrp > 0) {
-        X <- X[, -(1:nrp), drop = FALSE]
-        nam <- nam[-(1:nrp)]
-    }
+  # Get Model Matrices
+  if(cls == "lmer") X <- getME(fit, name = "X")
+  if(cls == "lme") X <- model.matrix(fit, data = getData(fit))
 
-    if (add.intercept) {
-        X <- cbind(rep(1), scale(X, scale = scale, center = center))
-        kappa(X, exact = exact)
-    } else {
-        kappa(scale(X, scale = scale, center = scale), exact = exact)
-    }
+  nam <- names(fixef(fit))
+
+  # exclude intercepts
+  nrp <- sum(1 * (nam == "(Intercept)"))
+  if (nrp > 0) {
+      X <- X[, -(1:nrp), drop = FALSE]
+      nam <- nam[-(1:nrp)]
+  }
+
+  if (add.intercept) {
+      X <- cbind(rep(1), scale(X, scale = scale, center = center))
+      kappa(X, exact = exact)
+  } else {
+      kappa(scale(X, scale = scale, center = scale), exact = exact)
+  }
 }
 
 #' Overdispersion glmer
