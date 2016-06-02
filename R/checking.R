@@ -293,15 +293,19 @@ diagnostic <- function(model, group = "obs", graphs = TRUE, influence = TRUE, mu
   }
 
   ## Display
-  if(influence == T & !is.null(i)) {
+  if(influence == T){
+    if(!is.null(i)) {
     message("Influence: \n")
     print(i)
    # message(paste0("Cooks Distances: ", paste0(cooks, collapse = "; ")))
+    }
   }
-  if(multicol == T & any(!is.na(v), !is.na(k))) {
+  if(multicol == T) {
+    if(any(!is.na(v), !is.na(k))) {
     message("Multicolinearity:\n")
     print(paste0("VIF: ", paste(names(v), round(v, digits = 1), sep = " ")))
     print(paste0("Kappa: ", round(k,digits = 1)))
+    }
   }
 }
 
