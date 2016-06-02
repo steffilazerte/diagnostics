@@ -42,5 +42,70 @@ temp$freq.top.log <- trans(temp$freq.top.log, trans = "boxcox", boxcox = 10)
 summary(m1.a <- lmer(freq.top.log ~ spl + (1|region), data = temp))
 
 temp <- songs
-summary(m0.b <- lmer(freq.top ~ spl + (1|region), data = temp))
-summary(m1.b <- lmer(freq.top.log ~ spl + (1|region), data = temp))
+summary(m0 <- lmer(freq.top ~ spl + (1|region), data = temp))
+summary(m1 <- lmer(freq.top.log ~ spl + (1|region), data = temp))
+
+temp <- songs
+songs$freq.top.log
+trans(songs$freq.top.log, trans = "boxcox", boxcox = 10, centre = TRUE)
+
+summary(m1 <- lmer(freq.top.log ~ spl + (1|region), data = temp))
+
+
+test <- rnorm(10)
+m <- min(test)
+m.abs <- min(abs(test))
+
+t <- "boxcox"; bx = 10
+x <- trans(test, t, bx)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m), 9))
+x <- trans(test, t, bx, centre = TRUE)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m.abs, centre = TRUE), 9))
+
+t <- "log"; bx = NA
+x <- trans(test, t, bx)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m), 9))
+x <- trans(test, t, bx, centre = TRUE)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m.abs, centre = TRUE), 9))
+
+t <- "ln"; bx = NA
+x <- trans(test, t, bx)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m), 9))
+x <- trans(test, t, bx, centre = TRUE)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m.abs, centre = TRUE), 9))
+
+t <- "inverse"; bx = NA
+x <- trans(test, t, bx)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m), 9))
+x <- trans(test, t, bx, centre = TRUE)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m, centre = TRUE), 9))
+
+t <- "^2"; bx = NA
+x <- trans(test, t, bx)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m), 9))
+x <- trans(test, t, bx, centre = TRUE)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m.abs, centre = TRUE), 9))
+
+t <- "^(1/2)"; bx = NA
+x <- trans(test, t, bx)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m), 9))
+x <- trans(test, t, bx, centre = TRUE)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m.abs, centre = TRUE), 9))
+
+t <- "asn"; bx = NA
+test2 <- (test - min(test)) / max(test - min(test))
+m2 <- min(test2)
+x <- trans(test2, t, bx)
+all(round(test2, 9) == round(trans.back(x, t, bx, min = m2), 9))
+
+test3 <- test2 - 0.5
+m3 <- min(abs(test3))
+x <- trans(test3, t, bx, centre = TRUE)
+all(sort(round(test3, 9)) == sort(round(trans.back(x, t, bx, min = m3, centre = TRUE), 9)))
+
+t <- "none"; bx = NA
+x <- trans(test, t, bx)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m), 9))
+x <- trans(test, t, bx, centre = TRUE)
+all(round(test, 9) == round(trans.back(x, t, bx, min = m, centre = TRUE), 9))
+

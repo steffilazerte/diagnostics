@@ -4,7 +4,7 @@
 \alias{trans.back}
 \title{Back transform}
 \usage{
-trans.back(x, trans, min = NA, boxcox = NA)
+trans.back(x, trans, boxcox = NA, min = NA, centre = FALSE)
 }
 \description{
 Back transform

@@ -4,7 +4,7 @@
 \alias{trans}
 \title{Transformations}
 \usage{
-trans(x, trans, boxcox = NA, anchor = TRUE)
+trans(x, trans, boxcox = NA, anchor = TRUE, centre = FALSE)
 }
 \description{
 Function to easily transform variables in a variety of ways.
