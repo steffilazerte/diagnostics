@@ -9,8 +9,10 @@ Description: Residual and QQ normality plots, multicollinearity,
 License: GPL-3
 Depends: ggplot2 (>= 2.1.0)
 Imports:
+    car,
     ggplot2,
     gridExtra,
+    influence.ME,
     lme4,
     Matrix,
     MASS,
