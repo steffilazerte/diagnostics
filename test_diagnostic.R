@@ -7,6 +7,10 @@ data(Orthodont)
 
 songs <- read.csv("~/Projects/Chorus - BCCH/Data/Datasets/bcch_pre_mean.txt")
 songs$spl <- songs$spl.orig
+
+m0 <- lm(freq ~ spl, data = songs)
+diagnostic(m0)
+
 m0 <- lmer(freq ~ spl + (1|region), data = songs)
 m1 <- lmer(freq.log ~ spl + (1|region), data = songs)
 diagnostic(m0)
