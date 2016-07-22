@@ -379,7 +379,7 @@ get.table <- function(model, analysis = NULL, type = "summary", level = NULL, pc
       x <- anova(model)
       names(x) <- c("df_num","df_den","F","P")
       x <- cbind(Parameter = row.names(x), x)
-    } else if(grepl("mer", class(m))) {
+    } else if(grepl("mer", class(model))) {
       x <- anova(model)
       names(x) <- c("df","SS","MS","F")
       x <- cbind(Parameter = row.names(x), x)
