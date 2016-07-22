@@ -191,7 +191,7 @@ sig.test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
     g <- as.list(1:nrow(data))
     names(g) <- 1:nrow(data)
   } else {
-    g <- lapply(unique(data[, group]), FUN = function(x) which(data[, group] == x))
+    g <- lapply(unique(data[, group]), FUN = function(x) which(data[, group] == as.character(x)))
     names(g) <- unique(data[, group])
   }
 
