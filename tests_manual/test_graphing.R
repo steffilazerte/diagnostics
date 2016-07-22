@@ -1,3 +1,23 @@
+
+test.plot <- function(model, level = "all", type = "QQ") {
+  par(mfrow=c(1, 2), mar = c(2,2,2,2))
+  if(type == "QQ") {
+    if(level == "all"){
+      qqnorm(residuals(model), main = "QQ Plot")
+      qqline(residuals(model))
+    } else {
+      qqnorm(ranef(model)[[level]][[1]], main = "QQ Plot")
+      qqline(ranef(model)[[level]][[1]])
+    }
+  } else if (type == "R") plot(fitted(model), residuals(model))
+  plot.new()
+  vps <- baseViewports()
+  pushViewport(vps$figure) ##   I am in the space of the autocorrelation plot
+  vp1 <- plotViewport(c(0,0,0,0))
+  if(type == "QQ") g <- ggQQ(model, level = level) else if(type == "R") g <- ggResid(model)
+  print(g, vp = vp1)
+}
+
 library(grid)
 library(gridBase)
 library(lme4)

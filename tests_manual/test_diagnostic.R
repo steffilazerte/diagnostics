@@ -80,3 +80,50 @@ diagnostic(m.lmer1)
 diagnostic(m.lmer1.2, verbose = TRUE)
 diagnostic(m.lmer2)
 diagnostic(m.lmer3)
+
+#########
+## MOCH PB
+#############
+
+#' ## Load Libraries
+library(seewave)
+library(lme4)
+library(lmerTest)
+library(dplyr)
+library(tidyr)
+library(diagnostics)
+
+#' ## Load in Data
+moch <- read.csv("~/Projects/Playback - MOCH/Data/Datasets/pb_moch_final.csv") %>%
+  select(name, f.ID, f.region, f.hab, f.spl, pb.order, pb.hab.c, pb.hab, pb.spl, pb.ID, pb.region, pb.freq.l, first.rxn, start.dist, rxn.dist, rxn.song) %>%
+  group_by(f.ID) %>%
+  mutate(f.spl = meandB(f.spl)) %>%
+  ungroup() %>%
+  mutate(pb.hab.c = factor(pb.hab.c, levels = c("rural","urban"), labels = c("Rural","Urban")),
+         pb.spl.c = factor(ifelse(pb.spl < median(pb.spl, na.rm = TRUE), "Quiet", "Noisy"), levels = c("Quiet", "Noisy")),
+         pb.order = factor(pb.order, levels = c("U/R","R/U"), labels = c("Urban/Rural","Rural/Urban")),
+         treat = factor(interaction(pb.hab.c, pb.order),
+                        levels = levels(interaction(pb.hab.c, pb.order)),
+                        labels = c("R.UR", "U.UR", "R.RU", "U.RU")))%>%
+  filter(!(f.ID %in% c("MCC34", "MCC36")))
+
+# /* --------------------- */
+#' ## Setting up contrasts
+# /* --------------------- */
+contrasts(moch$treat) <- matrix(c(c(-1, 1,  0, 0),  # R vs. U in UR order
+                                  c( 0, 0, -1, 1),  # R vs. U in RU order
+                                  c( -1/2, -1/2, 1/2, 1/2)) # UR vs. RU
+                                , ncol = 3)
+
+#' Centre spl so that comparing to mean makes sense
+moch$f.spl.orig <- moch$f.spl
+moch$f.spl <- scale(moch$f.spl, scale = F)
+
+
+#' ### Models
+#'
+round(summary(m0 <- lmer(first.rxn ~ treat + f.spl + start.dist + (1|f.ID), data = moch))$coefficients, 3)
+round(summary(m1 <- lmer(first.rxn ~ treat + f.spl + (1|f.ID), data = moch))$coefficients, 3)
+round(summary(m2 <- lmer(first.rxn ~ treat + (1|f.ID), data = moch))$coefficients, 3)
+
+diagnostic(m0)
