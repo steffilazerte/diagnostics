@@ -1,5 +1,7 @@
 #' KMO for PCA
 #'
+#' Test KMO of pca analyses
+#'
 #' @import MASS
 #' @export
 kmo = function( data ){
@@ -52,6 +54,8 @@ unacceptable for FA.'
 
 
 #' Bartlett sphere
+#'
+#' Bartlett sphere test for PCA
 #'
 #' @export
 bartlett.sphere<-function(data){
@@ -124,6 +128,8 @@ kappamer <- function (fit,
 
 #' Overdispersion glmer
 #'
+#' Tests for overdispersion
+#'
 #' @export
 overdisp.glmer <- function(modelglmer) {
   ## computing  estimated scale  ( binomial model)
@@ -135,6 +141,8 @@ overdisp.glmer <- function(modelglmer) {
 }
 
 #' Overdispersion glmer 2
+#'
+#' Tests for overdispersion
 #'
 #' @export
 overdisp2.glmer <- function(model) {
@@ -153,6 +161,8 @@ overdisp2.glmer <- function(model) {
 }
 
 #' Test for influential observtions
+#'
+#' Test for influential obserations
 #'
 #' @export
 sig.test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
@@ -187,7 +197,7 @@ sig.test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
 
   # Get new sig with sequential omission
   if(cls != "lmer") tests <- plyr::ldply(g, .fun = function(x) get.table(my.update(model, data = data[-x, ]))[, c("Parameter", "Value", "P")], .id = 'group', .progress = ifelse(verbose, "text", "none"))
-  if(cls == "lmer") tests <- plyr::ldply(g, .fun = function(x) get.table(as(my.update(model, data = data[-x, ]), "merModLmerTest"))[, c("Parameter", "Value", "P")], .id = 'group', .progress = ifelse(verbose, "text", "none"))
+  if(cls == "lmer") tests <- plyr::ldply(g, .fun = function(x) get.table(methods::as(my.update(model, data = data[-x, ]), "merModLmerTest"))[, c("Parameter", "Value", "P")], .id = 'group', .progress = ifelse(verbose, "text", "none"))
 
   if(any(tests$P == "")) {
     message("Influential: Some models had problems and alternate P-values could not be computed. Influential tests unreliable...")
@@ -207,6 +217,8 @@ sig.test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
 }
 
 #' Test for multicolinearity
+#'
+#' Test for MC
 #'
 #' @export
 multicol <- function(model) {
@@ -231,6 +243,8 @@ multicol <- function(model) {
 
 
 #' Run Diagnostics
+#'
+#' Run complete diagnostics
 #'
 #' @import gridExtra
 #' @import influence.ME
@@ -311,6 +325,8 @@ diagnostic <- function(model, group = "obs", graphs = TRUE, influence = TRUE, mu
 
 #' Report summary statistics for different models
 #'
+#' Grab data from differnet model types
+#'
 #' @export
 get.table <- function(model, analysis = NULL, type = "summary", level = NULL, pca = 1){
   if(type == "summary") {
@@ -326,8 +342,8 @@ get.table <- function(model, analysis = NULL, type = "summary", level = NULL, pc
     } else if(cls == "lme") {
       x <- as.data.frame(summary(model)$tTable)
       names(x) <- c("Value","SE","df", "T","P")
-      i1 <- intervals(model, which = "fixed")[[1]]
-      i2 <- intervals(model, which = "fixed", level = 0.9)[[1]]
+      i1 <- nlme::intervals(model, which = "fixed")[[1]]
+      i2 <- nlme::intervals(model, which = "fixed", level = 0.9)[[1]]
       if(is.null(level)) x$n <- nrow(summary(model)$groups) else x$n <- length(unique(model$data[,level]))
     } else if(cls == "lmer") {
       if(class(model) == "glmerMod") {

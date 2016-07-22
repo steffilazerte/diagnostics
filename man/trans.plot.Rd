@@ -8,6 +8,6 @@ trans.plot(model, t = c("log", "inverse", "^1/2", "^2", "^3"), boxcox = NA,
   find.best = FALSE, centre = FALSE, verbose = FALSE)
 }
 \description{
-Plot possible transformations
+Plot how transformations help fit
 }
 

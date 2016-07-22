@@ -7,6 +7,6 @@
 bartlett.sphere(data)
 }
 \description{
-Bartlett sphere
+Bartlett sphere test for PCA
 }
 

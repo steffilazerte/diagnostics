@@ -7,6 +7,6 @@
 multicol(model)
 }
 \description{
-Test for multicolinearity
+Test for MC
 }
 

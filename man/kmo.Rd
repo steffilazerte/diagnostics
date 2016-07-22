@@ -7,6 +7,6 @@
 kmo(data)
 }
 \description{
-KMO for PCA
+Test KMO of pca analyses
 }
 

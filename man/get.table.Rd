@@ -8,6 +8,6 @@ get.table(model, analysis = NULL, type = "summary", level = NULL,
   pca = 1)
 }
 \description{
-Report summary statistics for different models
+Grab data from differnet model types
 }
 

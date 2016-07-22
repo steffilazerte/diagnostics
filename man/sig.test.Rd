@@ -7,6 +7,6 @@
 sig.test(model, group = "obs", all = FALSE, verbose = FALSE)
 }
 \description{
-Test for influential observtions
+Test for influential obserations
 }
 

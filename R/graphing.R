@@ -1,5 +1,7 @@
 #' QQ normality plots with ggplot2
 #'
+#' Create QQ norm plots through ggplot2
+#'
 #' @import ggplot2
 #' @export
 ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
@@ -18,8 +20,8 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
 
   # Get residuals in a data frame
   if(level == "all") {
-    y <- resid(model)[!is.na(resid(model))]
-    m <- data.frame(n=1, resid = resid(model))
+    y <- residuals(model)[!is.na(residuals(model))]
+    m <- data.frame(n=1, resid = residuals(model))
     if(is.null(title)) title <- ifelse(cls == "lm", "QQ Plot", "QQ Plot: Fixed")
   } else {
     if(cls == "lme") rand <- nlme::ranef(model, level = level)[[1]]
@@ -75,14 +77,16 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
 
 
 
-#' QQ residual plots with ggplot2
+#' Residual plots with ggplot2
+#'
+#' Create residual plots through ggplot2
 #'
 #' @import ggplot2
 #' @export
 ggResid <- function(model) {
 
     model <- data.frame(fitted = fitted(model),
-                        residuals = scale(resid(model), center=F),
+                        residuals = scale(residuals(model), center=F),
                         row.names = NULL)
 
     g <- ggplot(model, aes(x = fitted, y = residuals)) +

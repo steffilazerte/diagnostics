@@ -2,11 +2,11 @@
 % Please edit documentation in R/graphing.R
 \name{ggResid}
 \alias{ggResid}
-\title{QQ residual plots with ggplot2}
+\title{Residual plots with ggplot2}
 \usage{
 ggResid(model)
 }
 \description{
-QQ residual plots with ggplot2
+Create residual plots through ggplot2
 }
 

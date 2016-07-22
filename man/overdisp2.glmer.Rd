@@ -7,6 +7,6 @@
 overdisp2.glmer(model)
 }
 \description{
-Overdispersion glmer 2
+Tests for overdispersion
 }
 

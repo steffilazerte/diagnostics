@@ -8,6 +8,6 @@ diagnostic(model, group = "obs", graphs = TRUE, influence = TRUE,
   multicol = TRUE, verbose = FALSE)
 }
 \description{
-Run Diagnostics
+Run complete diagnostics
 }
 

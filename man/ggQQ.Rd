@@ -7,6 +7,6 @@
 ggQQ(model, level = "all", plot = TRUE, title = NULL)
 }
 \description{
-QQ normality plots with ggplot2
+Create QQ norm plots through ggplot2
 }
 

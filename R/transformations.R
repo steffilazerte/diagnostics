@@ -1,5 +1,4 @@
 
-
 trans_basic <- function(x, trans, boxcox = NA) {
   if(trans == "boxcox") x <- (x ^ boxcox - 1) / boxcox
   if(trans == "log") x <- log(x, base = 10)
@@ -56,6 +55,8 @@ trans <- function(x, trans, boxcox = NA, anchor = TRUE, centre = FALSE){
 
 #' Back transform
 #'
+#' Back transform
+#'
 #' @export
 trans.back <- function(x, trans, boxcox = NA, min = NA, centre = FALSE) {
 
@@ -82,6 +83,8 @@ trans.back <- function(x, trans, boxcox = NA, min = NA, centre = FALSE) {
 }
 
 #' Plot possible transformations
+#'
+#' Plot how transformations help fit
 #'
 #' @import gridExtra
 #' @export
