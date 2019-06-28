@@ -58,7 +58,7 @@ trans <- function(x, trans, boxcox = NA, anchor = TRUE, centre = FALSE){
 #' Back transform
 #'
 #' @export
-trans.back <- function(x, trans, boxcox = NA, min = NA, centre = FALSE) {
+trans_back <- function(x, trans, boxcox = NA, min = NA, centre = FALSE) {
 
   if(centre == TRUE & !(trans %in% c("inverse", "none"))) {
     neg <- which(x < 0)
@@ -88,17 +88,11 @@ trans.back <- function(x, trans, boxcox = NA, min = NA, centre = FALSE) {
 #'
 #' @import gridExtra
 #' @export
-trans.plot <- function(model, t = c("log","inverse","^1/2","^2","^3"), boxcox = NA, find.best = FALSE, centre = FALSE, verbose = FALSE) {
+trans_plot <- function(model, t = c("log","inverse","^1/2","^2","^3"), boxcox = NA, find.best = FALSE, centre = FALSE, verbose = FALSE) {
 
   y <- as.character(terms(model)[[2]])
 
-  if(class(model) == "lm") {
-    data <- model$model
-  } else if (grepl("mer", class(model))) {
-    data <- model@frame
-  } else {
-    data <- nlme::getData(model)
-  }
+  data <- get_data(model)
 
   y.data <- list()
   y.data[[1]] <- data[, y]
@@ -114,7 +108,7 @@ trans.plot <- function(model, t = c("log","inverse","^1/2","^2","^3"), boxcox = 
     for(i in b) {
       temp <- data
       temp[, y] <- trans(y.data[[1]], trans = "boxcox", boxcox = i, centre = centre)
-      W <- ggQQ(my.update(model, data = temp), plot = FALSE)$W
+      W <- ggQQ(model_update(model, data = temp), plot = FALSE)$W
       best <- rbind(best, data.frame(b = i, W = W))
       if(verbose) message(paste0("\t\tBoxcox: ", i, "; W = ", W))
     }
@@ -134,7 +128,7 @@ trans.plot <- function(model, t = c("log","inverse","^1/2","^2","^3"), boxcox = 
       for(i in b)  {
         temp <- data
         temp[, y] <- trans(y.data[[1]], trans = "boxcox", boxcox = i)
-        W <- ggQQ(my.update(model, data = temp), plot = FALSE)$W
+        W <- ggQQ(model_update(model, data = temp), plot = FALSE)$W
         best <- rbind(best, data.frame(b = i, W = W))
         if(verbose) message(paste0("\t\tBoxcox: ", i, "; W = ", W))
       }
@@ -169,8 +163,14 @@ trans.plot <- function(model, t = c("log","inverse","^1/2","^2","^3"), boxcox = 
   for(i in 1:length(y.data)) {
     temp <- data
     temp[, y] <- y.data[[i]]
-    q[[i]] <- ggQQ(my.update(model, data = temp), title = title[i])
+    m_update <- model_update(model, data = temp)
+    q[[paste0("qq", i)]] <- ggQQ(m_update, title = title[i])
+    q[[paste0("resid", i)]] <- ggResid(m_update)
   }
 
-  do.call("grid.arrange", args = c(q, nrow = 1))
+  q <- q[order(names(q))]
+
+  do.call("grid.arrange", args = c(q, nrow = 2))
+
+  if(find.best) return(best$b[1])
 }

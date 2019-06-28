@@ -6,14 +6,11 @@
 #' @export
 ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
 
-  cls <- class(model)
-  if(grepl("mer", cls)) cls <- "lmer"
-
-  if(!(cls %in% c("lm", "lme", "lmer"))) {
+  if(!is_lm(model) & !is_lme(model) & !is_mer(model) & !is_gls(model)) {
     stop("'model' must be either a lm, lme, lmer, or glmer model")
   }
 
-  if(cls == "lm" & level != "all") {
+  if((is_lm(model) | is_gls(model)) & level != "all") {
     message("levels only apply to mixed models, reverting to level = \"all\"")
     level <- "all"
   }
@@ -22,10 +19,10 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
   if(level == "all") {
     y <- residuals(model)[!is.na(residuals(model))]
     m <- data.frame(n=1, resid = residuals(model))
-    if(is.null(title)) title <- ifelse(cls == "lm", "QQ Plot", "QQ Plot: Fixed")
+    if(is.null(title)) title <- ifelse(is_lm(model) | is_gls(model), "QQ Plot", "QQ Plot: Fixed")
   } else {
-    if(cls == "lme") rand <- nlme::ranef(model, level = level)[[1]]
-    if(cls == "lmer") {
+    if(is_lme(model)) rand <- nlme::ranef(model, level = level)[[1]]
+    if(is_mer(model)) {
       rand <- lme4::ranef(model)
       rand <- rand[[names(rand)[grepl(paste0("^", level, "$"), names(rand))]]][[1]]
     }
@@ -40,7 +37,7 @@ ggQQ <- function(model, level = "all", plot = TRUE, title = NULL) {
     message(paste0("Too little variability in '", level, "': QQ Norm plot skipped"))
   } else {
     # Setup for qqline
-    x <- qnorm(c(0.25,0.75))
+    x <- qnorm(c(0.25, 0.75))
     y <- quantile(y, c(0.25, 0.75))
     slope <- diff(y)/diff(x)
     int <- y[1L] - slope * x[1L]
@@ -96,4 +93,26 @@ ggResid <- function(model) {
       labs(title = "Residual Plot")
 
     return(g)
+}
+
+#' @export
+diag_plots <- function(model, title = NULL) {
+
+  if(!is_lm(model) & !is_lme(model) & !is_mer(model) & !is_gls(model)) stop("'model' must be either a lm, lme, lmer, or glmer model")
+
+  # Get residual plots and normality plots for all levels of the random variables (if present)
+  g <- list()
+
+  # Fixed Effects
+  if(!is.null(title)) t_resid <- paste(title, "- Residual Plot")
+  g[[1]] <- ggResid(model) + labs(title = t_resid) # Residual
+  g[[2]] <- ggQQ(model) + labs(title = "QQ Normality Plot") # Normality
+
+  # Random Effects Normality
+  if(is_lme(model) | is_mer(model)) {
+    for(a in get_random(model)) g[[length(g) + 1]] <- ggQQ(model, level = a)
+  }
+
+  # Show all together
+  return(do.call(gridExtra::grid.arrange, c(g, nrow = 1)))  ## Plot
 }

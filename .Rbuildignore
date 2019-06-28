@@ -2,3 +2,4 @@
 ^\.Rproj\.user$
 ^.gitignore$
 ^tests_manual$
+^data-raw$

@@ -1,13 +1,71 @@
-library(lme4)
-library(nlme)
-library(lmerTest)
-library(diagnostics)
+context("Check functions")
 
-pb$cont <- factor(paste0(pb$experiment, "-",pb$treatment))
-contrasts(pb$cont) <- cbind(c(-1/2,1/2,0,0),
-                              c(0,0,-1/2,1/2),
-                              c(1/4,1/4,-1/4,-1/4))
+test_that("vif_mer calculates expected", {
+  expect_equal(vif_mer(m_lme), c("wt" = 1.009952, "carb" = 1.009952), tolerance = 0.0000005)
+  expect_equal(vif_mer(m_lmer), c("wt" = 1.009952, "carb" = 1.009952), tolerance = 0.0000005)
+  expect_equal(vif_mer(m_glmer), c("wt" = 1.281948, "carb" = 1.281948), tolerance = 0.0000005)
+  expect_equal(vif_mer(m_glmer2), c("spl" = 1.121321, "hab" = 1.110414, "regionkel" = 1.090627, "regionwil" = 1.208293 ), tolerance = 0.0000005)
+})
 
+test_that("vif() calculates vif for all model types", {
+  expect_equal(car::vif(m_lm), uni_vif(m_lm))
+  expect_equal(car::vif(m_glm), uni_vif(m_glm))
+  expect_equal(car::vif(m_glm2), uni_vif(m_glm2))
+  expect_equal(vif_mer(m_lme), uni_vif(m_lme))
+  expect_equal(vif_mer(m_lmer), uni_vif(m_lmer))
+  expect_equal(vif_mer(m_glmer), uni_vif(m_glmer))
+  expect_equal(vif_mer(m_glmer2), uni_vif(m_glmer2))
+})
+
+
+test_that("uni_kappa calculates expected for all model types", {
+  expect_equal(uni_kappa(m_lm), kappa(m_lm))
+  #expect_equal(uni_kappa(m_glm), kappa(m_glm))
+  #expect_equal(uni_kappa(m_glm2), kappa(m_lm))
+  #expect_equal(uni_kappa(m_lme), kappa(m_lm))
+  expect_equal(uni_kappa(m_lmer), kappa(m_lm))
+  expect_equal(uni_kappa(m_glmer), kappa(m_lm))
+  #expect_equal(uni_kappa(m_glmer2), kappa(m_glm2))
+})
+
+test_that("uni_kappa options", {
+  expect_lt(uni_kappa(m_lm, scale = TRUE), uni_kappa(m_lm))
+  expect_lt(uni_kappa(m_glm, scale = TRUE), uni_kappa(m_glm))
+  #expect_lt(uni_kappa(m_lm, scale = TRUE), uni_kappa(m_lme))
+  expect_lt(uni_kappa(m_lmer, scale = TRUE), uni_kappa(m_lmer))
+  expect_lt(uni_kappa(m_glmer, scale = TRUE), uni_kappa(m_glmer))
+
+  #expect_lt(uni_kappa(m_lm, intercept = FALSE), uni_kappa(m_lm))
+  #expect_lt(uni_kappa(m_glm, intercept = FALSE), uni_kappa(m_glm))
+  #expect_lt(uni_kappa(m_lm, intercept = FALSE), uni_kappa(m_lme))
+  #expect_lt(uni_kappa(m_lmer, intercept = FALSE), uni_kappa(m_lmer))
+  #expect_lt(uni_kappa(m_glmer, intercept = FALSE), uni_kappa(m_glmer))
+})
+
+
+test_that("overdispersion", {
+  overdisp(m_glmer2)
+  overdisp(m_glm2)
+})
+
+test_that("Influential variables", {
+  expect_error(sig_test(m_lmer))
+  expect_silent(sig_test(m_lmer2))
+  expect_message(sig_test(m_lmer2, group = "cyl"))
+})
+
+test_that("multicol()", {
+ expect_silent(multicol(m_lmer2))
+})
+
+test_that("Diagnostics", {
+  expect_error(diagnostic(m_lmer2), NA)
+  expect_error(diagnostic(m_lmer2, group = "cyl"), NA)
+
+  diagnostic(m_lmer3, group = "site")
+
+  expect_error(diagnostic(m_glmer2), NA)
+})
 
 temp <- pb[!pb$prob_vol & pb$ID!= "male06", ]
 summary(m1 <- lmer(PC1_dist ~ cont + (1|ID), data = temp))

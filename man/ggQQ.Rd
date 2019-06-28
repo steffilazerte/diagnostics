@@ -9,4 +9,3 @@ ggQQ(model, level = "all", plot = TRUE, title = NULL)
 \description{
 Create QQ norm plots through ggplot2
 }
-

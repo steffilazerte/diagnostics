@@ -10,4 +10,3 @@ diagnostic(model, group = "obs", graphs = TRUE, influence = TRUE,
 \description{
 Run complete diagnostics
 }
-

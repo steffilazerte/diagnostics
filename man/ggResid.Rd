@@ -9,4 +9,3 @@ ggResid(model)
 \description{
 Create residual plots through ggplot2
 }
-

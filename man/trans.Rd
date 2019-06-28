@@ -10,4 +10,3 @@ trans(x, trans, boxcox = NA, anchor = TRUE, centre = FALSE)
 Function to easily transform variables in a variety of ways.
 By default, variables are anchored at one to maximize the effectiveness of the transformations.
 }
-

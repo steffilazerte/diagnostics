@@ -9,4 +9,3 @@ multicol(model)
 \description{
 Test for MC
 }
-

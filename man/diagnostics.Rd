@@ -8,4 +8,3 @@
 \description{
 This package is a collection of functions that I find useful when check models.
 }
-

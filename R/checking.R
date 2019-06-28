@@ -1,84 +1,28 @@
-#' KMO for PCA
+#' Universal calculation of Variance Inflation Factors (VIF)
 #'
-#' Test KMO of pca analyses
+#' Calculates VIF for most models
 #'
-#' @import MASS
-#' @export
-kmo = function( data ){
-  ## FROM http://www.opensubscriber.com/message/r-help@stat.math.ethz.ch/7315408.html
-  X <- cor(as.matrix(data))
-  iX <- ginv(X)
-  S2 <- diag(diag((iX^-1)))
-  AIS <- S2%*%iX%*%S2                      # anti-image covariance matrix
-  IS <- X+AIS-2*S2                         # image covariance matrix
-  Dai <- sqrt(diag(diag(AIS)))
-  IR <- ginv(Dai)%*%IS%*%ginv(Dai)         # image correlation matrix
-  AIR <- ginv(Dai)%*%AIS%*%ginv(Dai)       # anti-image correlation matrix
-  a <- apply((AIR - diag(diag(AIR)))^2, 2, sum)
-  AA <- sum(a)
-  b <- apply((X - diag(nrow(X)))^2, 2, sum)
-  BB <- sum(b)
-  MSA <- b/(b+a)                        # indiv. measures of sampling adequacy
-
-  AIR <- AIR-diag(nrow(AIR))+diag(MSA)  # Examine the anti-image of the
-                                        # correlation matrix. That is the
-                                        # negative of the partial correlations,
-                                        # partialling out all other variables.
-
-  kmo <- BB/(AA+BB)                     # overall KMO statistic
-
-  # Reporting the conclusion
-    if (kmo >= 0.00 && kmo < 0.50){
-      test <- 'The KMO test yields a degree of common variance
-unacceptable for FA.'
-    } else if (kmo >= 0.50 && kmo < 0.60){
-      test <- 'The KMO test yields a degree of common variance miserable.'
-    } else if (kmo >= 0.60 && kmo < 0.70){
-      test <- 'The KMO test yields a degree of common variance mediocre.'
-    } else if (kmo >= 0.70 && kmo < 0.80){
-      test <- 'The KMO test yields a degree of common variance middling.'
-    } else if (kmo >= 0.80 && kmo < 0.90){
-      test <- 'The KMO test yields a degree of common variance meritorious.'
-    } else {
-      test <- 'The KMO test yields a degree of common variance marvelous.'
-    }
-
-    ans <- list(  overall = kmo,
-                  report = test,
-                  individual = MSA,
-                  AIS = AIS,
-                  AIR = AIR )
-    return(ans)
-
-}    # end of kmo()
-
-
-#' Bartlett sphere
-#'
-#' Bartlett sphere test for PCA
-#'
-#' @export
-bartlett.sphere<-function(data){
-  ##FROM https://stat.ethz.ch/pipermail/r-help/2011-June/281243.html
-  chi.square <- -( (nrow(data)-1) - (2*ncol(data)-5)/6 )*log(det(cor(data,use='pairwise.complete.obs')))
-  paste0('chi.square value ',chi.square , ' on ', (ncol(data)^2-ncol(data))/2, ' degrees of freedom.', ' p-value: ', pchisq(chi.square,(ncol(data)^2-ncol(data))/2,lower.tail=F))
-}
-
-#' Check VIF
-#'
+#' For non-mixed models (lm and glm) uses vif from car package. For mixed models
+#' uses function from Austin F. Frank:
 #' https://github.com/aufrank/R-hacks/blob/master/mer-utils.R
 #'
-#' @import lme4
-#' @import Matrix
+#' "VIF values greater than ten suggest strong collinearity." (Quinn & Keough, 2002)
+#'
 #' @export
-vifmer <- function (fit) {
-    ## adapted from rms::vif
+uni_vif <- function(model) {
+  if(is_lm(model)) return(car::vif(model))
+  if(is_lme(model) | is_mer(model)) return(vif_mer(model))
+}
 
-    v <- vcov(fit)
-    nam <- names(fixef(fit))
+# Based on function by Austin F. Frank:
+# https://github.com/aufrank/R-hacks/blob/master/mer-utils.R
+vif_mer <- function(model) {
+    ## adapted from rms::vif
+    v <- as.matrix(stats::vcov(model))
+    nam <- names(get_fixed(model))
 
     # exclude intercepts
-    ns <- sum(1 * (nam == "Intercept" | nam == "(Intercept)"))
+    ns <- which(nam == "(Intercept)")
     if (ns > 0) {
        v <- v[-(1:ns), -(1:ns), drop = FALSE]
        nam <- nam[-(1:ns)]
@@ -90,128 +34,123 @@ vifmer <- function (fit) {
     return(v)
 }
 
-#' Check Kappa
+#' Universal calculation of Condition Number (kappa)
 #'
+#' Calculates Condition Number of matrix for common model types
+#'
+#' For non-mixed models (lm and glm) uses kappa() from base package. For mixed models
+#' uses function from Austin F. Frank:
 #' https://github.com/aufrank/R-hacks/blob/master/mer-utils.R
 #'
-#' Condition number test less than 10 or 20 (less than 30)
+#' Condition numbers should be less than 10 or 20 or you have multicollinearity
+#' "values greater than 30 indicate collinearities that require attention." (Quinn and Keough
+#' 2002)
 #'
-#' @import lme4
+#' Note that kappa(lm) == uni_kappa(lm) but kappa(glm) != uni_kappa(glm)
+#' Has to do with method of calculation, use with caution
+#'
 #' @export
-kappamer <- function (fit,
-                      scale = TRUE, center = FALSE,
-                      add.intercept = FALSE,
-                      exact = FALSE) {
-  cls <- class(fit)
-  if(grepl("merMod", cls)) cls <- "lmer"
+uni_kappa <- function(model, scale = FALSE, center = FALSE, exact = FALSE, add_intercept = TRUE) {
 
   # Get Model Matrices
-  if(cls == "lmer") X <- getME(fit, name = "X")
-  if(cls == "lme") X <- model.matrix(fit, data = getData(fit))
+  if(is_lm(model) | is_lme(model)) X <- stats::model.matrix(model)
+  if(is_mer(model)) X <- lme4::getME(model, name = "X")
 
-  nam <- names(fixef(fit))
+  # Keep names
+  nam <- names(get_fixed(model))
 
-  # exclude intercepts
-  nrp <- sum(1 * (nam == "(Intercept)"))
-  if (nrp > 0) {
-      X <- X[, -(1:nrp), drop = FALSE]
-      nam <- nam[-(1:nrp)]
+  # Exclude intercepts
+  intercept <- which(nam == "(Intercept)")
+  if(intercept > 0) {
+    X <- X[, -(1:intercept), drop = FALSE]
+    nam <- nam[-(1:intercept)]
   }
 
-  if (add.intercept) {
-      X <- cbind(rep(1), scale(X, scale = scale, center = center))
-      kappa(X, exact = exact)
+  if(add_intercept) {
+    X <- cbind(rep(1), scale(X, scale = scale, center = center))
+    kappa(X, exact = exact)
   } else {
-      kappa(scale(X, scale = scale, center = scale), exact = exact)
+    kappa(scale(X, scale = scale, center = scale), exact = exact)
   }
 }
 
-#' Overdispersion glmer
+#' Overdispersion for glmer
 #'
-#' Tests for overdispersion
+#' Approximate test of overdispersion from:
+#' http://bbolker.github.io/mixedmodels-misc/glmmFAQ.html#overdispersion
 #'
-#' @export
-overdisp.glmer <- function(modelglmer) {
-  ## computing  estimated scale  ( binomial model)
-  ##following  D. Bates :
-  ##That quantity is the square root of the penalized residual sum of
-  ##squares divided by n, the number of observations, evaluated as:
-  n <- length(resid(modelglmer))
-  return(  sqrt( sum(c(resid(modelglmer), modelglmer@u) ^2) / n ) )
-}
-
-#' Overdispersion glmer 2
-#'
-#' Tests for overdispersion
+#' @author Ben Bolker
 #'
 #' @export
-overdisp2.glmer <- function(model) {
-  # number of variance parameters in
-  #   an n-by-n variance-covariance matrix
+overdisp <- function(model) {
+  ## number of variance parameters in
+  ## an n-by-n variance-covariance matrix
   vpars <- function(m) {
     nrow(m)*(nrow(m)+1)/2
   }
-  model.df <- sum(sapply(VarCorr(model),vpars))+length(fixef(model))
-  rdf <- nrow(model.frame(model))-model.df
-  rp <- residuals(model,type="pearson")
+  model.df <- sum(sapply(lme4::VarCorr(model), vpars)) + length(get_fixed(model))
+  rdf <- nrow(stats::model.frame(model)) - model.df
+  rp <- stats::residuals(model, type = "pearson")
   Pearson.chisq <- sum(rp^2)
   prat <- Pearson.chisq/rdf
-  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
-  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
+  pval <- stats::pchisq(Pearson.chisq, df = rdf, lower.tail = FALSE)
+  return(c(chisq = Pearson.chisq, ratio = prat, rdf = rdf, p = pval))
 }
 
-#' Test for influential observtions
+#' Test for influential observations
 #'
-#' Test for influential obserations
 #'
 #' @export
-sig.test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
+sig_test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
 
-  cls <- class(model)
-  if(grepl("merMod", cls)) cls <- "lmer"
-  if(!(cls %in% c("lm", "lme", "lmer"))) stop("'model' must be either a lm, lme, lmer, or glmer model")
+  if(!is_lm(model) & !is_lme(model) & !is_mer(model)) stop("'model' must be either a lm, glm, lme, lmer, or glmer model")
 
-  if(cls == "lmer" & !grepl("LmerTest", class(model)) & !grepl("glmer", class(model))){
-    stop("Can't test for influential observations without p-values, right now. Try again with library(lmerTest)")
+  if(is_mer(model) & !is_merTest(model)){
+    stop("Require lmer/glmer models to be run with the lmerTest package to calculate degrees of freedom. Load the lmerTest package with 'library(lmerTest)' and run the lmer()/glmer() model again.")
   }
 
-  data <- getData(model)
-  orig <- get.table(model)
+  data <- as.data.frame(get_data(model))
+  orig <- get_table(model)
 
   # Check that obs correct
-  if(cls == "lm" & group != "obs") {
+  if(is_lm(model) & group != "obs") {
     message("Different groupings only apply to mixed models, reverting to group = \"obs\"")
     group <- "obs"
   } else if (group != "obs" & !(group %in% names(data))) {
     stop("'group' must be the name of a column (i.e. 'ID'), or 'obs', to reflect observation level grouping.")
   }
 
-  # Grouping
+  # Group and omit group observations from lists of data sets
   if(group == "obs") {
-    g <- as.list(1:nrow(data))
-    names(g) <- 1:nrow(data)
+    g <- tibble::tibble(type = "obs", obs = 1:nrow(data)) %>%
+      dplyr::group_by(obs) %>%
+      dplyr::do(data = data[-.$obs, ]) %>%
+      dplyr::ungroup()
   } else {
-    g <- lapply(unique(data[, group]), FUN = function(x) which(data[, group] == as.character(x)))
-    names(g) <- unique(data[, group])
+    g <- tibble::tibble(type = group, obs = unique(data[, group])) %>%
+      dplyr::group_by(obs) %>%
+      dplyr::do(data = data[data[, group] != .$obs, ]) %>%
+      dplyr::ungroup()
   }
 
   # Get new sig with sequential omission
-  if(cls != "lmer") tests <- plyr::ldply(g, .fun = function(x) get.table(my.update(model, data = data[-x, ]))[, c("Parameter", "Value", "P")], .id = 'group', .progress = ifelse(verbose, "text", "none"))
-  if(cls == "lmer") tests <- plyr::ldply(g, .fun = function(x) get.table(methods::as(my.update(model, data = data[-x, ]), "merModLmerTest"))[, c("Parameter", "Value", "P")], .id = 'group', .progress = ifelse(verbose, "text", "none"))
+  tests <- g %>%
+    dplyr::mutate(new_fit = purrr::map(data, diff_p, orig = orig, model = model)) %>%
+    tidyr::unnest(new_fit)
 
   if(any(tests$P == "")) {
     message("Influential: Some models had problems and alternate P-values could not be computed. Influential tests unreliable...")
   } else {
-    output <- merge(tests, orig[, c("Parameter", "Value", "P")], by = "Parameter", suffixes = c("", ".orig"))
-    output[, c("Value", "P", "Value.orig", "P.orig")] <- apply(output[, c("Value", "P", "Value.orig", "P.orig")], 2, round, 4)
-    output$diff5 <- (output$P < 0.05) != (output$P.orig < 0.05)
-    output$diff10 <- (output$P < 0.10) != (output$P.orig < 0.10)
 
-    if(!all) output <- output[output$diff5 | output$diff10, ]
+    if(!all) tests <- dplyr::filter(tests, diff5 | diff10)
 
-    if(nrow(output) == 0) message("No influential observations") else {
-      return(output)
-      message("Note that for group = \"obs\" numbers returned refer to the row in a data frame without NA values.")
+    tests <- tests %>%
+      dplyr::left_join(orig, by = "Parameter", suffix = c(".new", ".orig")) %>%
+      dplyr::select(Parameter, Value.new, SE.new, P.new, Value.orig, SE.orig, P.orig)
+
+    if(nrow(tests) == 0) message("No influential observations") else {
+      return(tests)
+      if(group == "obs") message("Note that for group = \"obs\" numbers returned refer to the row in a data frame without NA values.")
     }
   }
 }
@@ -222,17 +161,14 @@ sig.test <- function(model, group = "obs", all = FALSE, verbose = FALSE){
 #'
 #' @export
 multicol <- function(model) {
-  cls <- class(model)
-  if(grepl("merMod", cls)) cls <- "lmer"
 
-  if(get.ncoef(model) > 2){
-    if(cls == "lm") {
-      v <- car::vif(model)[, 1]
-      k <- kappa(model)
-    }
-    if(cls != "lm") {
-      v <- vifmer(model)
-      k <- kappamer(model)
+  if(get_ncoef(model) > 2){
+    if(is_lm(model)) {
+      v <- uni_vif(model)
+      k <- uni_kappa(model)
+    } else {
+      v <- uni_vif(model)
+      k <- uni_kappa(model)
     }
   } else {
     v <- k <- NA
@@ -252,14 +188,9 @@ multicol <- function(model) {
 #' @export
 diagnostic <- function(model, group = "obs", graphs = TRUE, influence = TRUE, multicol = TRUE, verbose = FALSE) {
 
-  cls <- class(model)
-  if(grepl("merMod", cls)) cls <- "lmer"
-  if(!(cls %in% c("lm", "lme", "lmer"))) stop("'model' must be either a lm, lme, lmer, or glmer model")
+  if(!is_lm(model) & !is_lme(model) & !is_mer(model)) stop("'model' must be either a lm, lme, lmer, or glmer model")
 
-  #require(nlme)
-  #require(nlmeU)
-
-  ## Get residual plots and normality plots for all levels of the random variables (if present)
+  # Get residual plots and normality plots for all levels of the random variables (if present)
   if(graphs == T){
     g <- list()
 
@@ -268,8 +199,8 @@ diagnostic <- function(model, group = "obs", graphs = TRUE, influence = TRUE, mu
     g[[2]] <- ggQQ(model) + labs(title = "QQ Normality Plot") # Normality
 
     # Random Effects Normality
-    if(cls %in% c("lme", "lmer")) {
-      for(a in get.random(model)) g[[length(g) + 1]] <- ggQQ(model, level = a)
+    if(is_lme(model) | is_mer(model)) {
+      for(a in get_random(model)) g[[length(g) + 1]] <- ggQQ(model, level = a)
     }
 
     # Show all together
@@ -279,17 +210,19 @@ diagnostic <- function(model, group = "obs", graphs = TRUE, influence = TRUE, mu
   # Get influential observations
   if(influence == T){
     # Influential obs
-    i <- sig.test(model, group = group, verbose = verbose)
+    i <- sig_test(model, group = group, verbose = verbose)
     if(!is.null(i)) {
-      i <- i[, c("group", "Parameter", "Value.orig", "Value", "P.orig", "P")]
-      i$Diff <- NA
-      i$Diff[i$P.orig < 0.05 & (i$P >= 0.05 & i$P < 0.10)] <- "Sig => Trend"
-      i$Diff[i$P.orig < 0.05 & (i$P >= 0.10)] <- "Sig => Non Sig"
-      i$Diff[(i$P.orig >= 0.05 & i$P.orig < 0.10) & (i$P < 0.05)] <- "Trend => Sig"
-      i$Diff[(i$P.orig >= 0.05 & i$P.orig < 0.10) & (i$P >= 0.10)] <- "Trend => Non Sig"
-      i$Diff[(i$P.orig >= 0.10) & (i$P < 0.05)] <- "Non Sig => Sig"
-      i$Diff[(i$P.orig >= 0.10) & (i$P >= 0.05 & i$P < 0.10)] <- "Non Sig => Trend"
-      names(i) <- c("Obs", "Param", "Value", "New Value", "P", "New P", "Diff")
+      i <- i %>%
+        dplyr::select(Parameter, Value.orig, Value.new, P.orig, P.new) %>%
+        dplyr::mutate(Obs = group,
+                      Diff = NA,
+                      Diff = replace(Diff, P.orig < 0.05 & (P.new >= 0.05 & P.new < 0.10), "Sig => Trend"),
+                      Diff = replace(Diff, P.orig < 0.05 & (P.new >= 0.10), "Sig => Non Sig"),
+                      Diff = replace(Diff, (P.orig >= 0.05 & P.orig < 0.10) & P.new < 0.05, "Trend => Sig"),
+                      Diff = replace(Diff, (P.orig >= 0.05 & P.orig < 0.10) & P.new >= 0.10, "Trend => Non Sig"),
+                      Diff = replace(Diff, P.orig >= 0.10 & P.new < 0.05, "Non Sig => Sig"),
+                      Diff = replace(Diff, P.orig >= 0.10 & (P.new >= 0.05 & P.new < 0.10), "Non Sig => Trend")) %>%
+        dplyr::rename(Param = Parameter, Value = Value.orig, `New Value` = Value.new, P = P.orig, `New P` = `P.new`)
 
     }
 
@@ -328,30 +261,30 @@ diagnostic <- function(model, group = "obs", graphs = TRUE, influence = TRUE, mu
 #' Grab data from differnet model types
 #'
 #' @export
-get.table <- function(model, analysis = NULL, type = "summary", level = NULL, pca = 1){
+get_table <- function(model, analysis = NULL, type = "summary", level = NULL, pca = 1){
   if(type == "summary") {
-    cls <- class(model)
-    if(grepl("merMod", cls)) cls <- "lmer"
-    if(cls == "lm"){
+    if(is_lm(model)){
       x <- as.data.frame(summary(model)$coefficients)
       names(x) <- c("Value","SE","T","P")
       x$df <- max(summary(model)$df)
       i1 <- confint(model)
       i2 <- confint(model, level = 0.9)
       x$n <- length(model$fitted.values)
-    } else if(cls == "lme") {
+      R2 <- c(summary(model)$r.squared, "")
+    } else if(is_lme(model)) {
       x <- as.data.frame(summary(model)$tTable)
       names(x) <- c("Value","SE","df", "T","P")
       i1 <- nlme::intervals(model, which = "fixed")[[1]]
       i2 <- nlme::intervals(model, which = "fixed", level = 0.9)[[1]]
       if(is.null(level)) x$n <- nrow(summary(model)$groups) else x$n <- length(unique(model$data[,level]))
-    } else if(cls == "lmer") {
+      R2 <- MuMIn::r.squaredGLMM(model)
+    } else if(is_mer(model)) {
       if(class(model) == "glmerMod") {
         x <- as.data.frame(summary(model)$coefficients)
         names(x) <- c("Value", "SE", "T","P")
         x$note <- "Test statistic is z not T"
       } else if (grepl("Test", class(model))) {
-        x <- suppressMessages(as.data.frame(lmerTest::summary(model)$coefficients))
+        x <- as.data.frame(lmerTest:::summary.lmerModLmerTest(model)$coefficients)
         if(any(names(x) == "df")) {
           names(x) <- c("Value", "SE", "df","T","P")
         } else names(x) <- c("Value", "SE", "T")
@@ -359,6 +292,7 @@ get.table <- function(model, analysis = NULL, type = "summary", level = NULL, pc
         x <- as.data.frame(summary(model)$coefficients)
         names(x) <- c("Value", "SE", "T")
       }
+      R2 <- MuMIn::r.squaredGLMM(model)
       i1 <- data.frame(confint(model, method = "Wald"))
       i1 <- i1[-grep(".sig",row.names(i1)),]
       i2 <- data.frame(confint(model, method = "Wald", level = 0.9))
@@ -373,13 +307,15 @@ get.table <- function(model, analysis = NULL, type = "summary", level = NULL, pc
     if(!any(grepl("^df$", names(x)))) x$df <- ""
     if(!any(grepl("^P$", names(x)))) x$P <- ""
     if(!any(grepl("^note$", names(x)))) x$note <- ""
-    x <- x[,c("Parameter","Value","SE","df","T","P","n","CI.95","sig.95","CI.90","sig.90","note")]
+    x$R2.m <- R2[1]
+    x$R2.c <- R2[2]
+    x <- x[,c("Parameter","Value","CI.95","df","T","P","n","SE","sig.95","CI.90","sig.90","R2.m", "R2.c","note")]
   } else if(type == "anova") {
-    if(cls == "lme") {
+    if(is_lme(model)) {
       x <- anova(model)
       names(x) <- c("df_num","df_den","F","P")
       x <- cbind(Parameter = row.names(x), x)
-    } else if(grepl("mer", class(model))) {
+    } else if(is_mer(model)) {
       x <- anova(model)
       names(x) <- c("df","SS","MS","F")
       x <- cbind(Parameter = row.names(x), x)

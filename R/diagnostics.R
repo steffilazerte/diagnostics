@@ -8,6 +8,6 @@
 #' @importFrom lme4 ranef
 #' @importFrom nlme ranef
 #' @importClassesFrom lme4 merMod
-#' @importClassesFrom lmerTest merModLmerTest
+#' @importClassesFrom lmerTest lmerModLmerTest
 #'
 NULL
